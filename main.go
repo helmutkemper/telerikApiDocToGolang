@@ -9,6 +9,7 @@ import (
 	"github.com/helmutkemper/grab"
 	"io/ioutil"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -47,9 +48,165 @@ func process() {
 		os.Exit(1)
 	}
 
-	for id := range dataToCode {
+	structList := make(map[string]interface{})
 
+	for id, data := range dataToCode {
+		idList := strings.Split(id, ".")
+		var key, element string
+		if len(idList) > 1 {
+			key = idList[len(idList)-2]
+			element = idList[len(idList)-1]
+		} else {
+			key = idList[len(idList)-1]
+			element = "main"
+		}
+
+		if structList[key] == nil {
+			structList[key] = make(map[string]interface{})
+		}
+
+		structList[key].(map[string]interface{})[element] = data
 	}
+
+	var keys []string
+	for structName, structKeys := range structList {
+		if structKeys.(map[string]interface{})["main"] != nil {
+			keys = append(keys, structName)
+		}
+	}
+	sort.Strings(keys)
+
+	for _, structName := range keys {
+		data := structList[structName]
+
+		subProcessData(data.(map[string]interface{})["main"], structName, "KendoGrid")
+	}
+
+	fmt.Printf("\n\n\n\n\n")
+
+	for _, structName := range keys {
+		data := structList[structName]
+
+		if len(data.(map[string]interface{})) == 1 {
+			continue
+		}
+
+		fmt.Printf("type %v struct {\n", strings.Title(structName))
+		for subStructName, subStructData := range data.(map[string]interface{}) {
+			if subStructName == "main" {
+				continue
+			}
+
+			subProcessData(subStructData, subStructName, "KendoGrid")
+		}
+		fmt.Printf("}\n\n\n\n\n")
+	}
+
+	keys = []string{}
+	for structName, structKeys := range structList {
+		if structKeys.(map[string]interface{})["main"] == nil {
+			keys = append(keys, structName)
+		}
+	}
+	sort.Strings(keys)
+
+	for _, structName := range keys {
+		data := structList[structName]
+
+		fmt.Printf("type %v struct {\n", strings.Title(structName))
+		for subStructName, subStructData := range data.(map[string]interface{}) {
+			subProcessData(subStructData, subStructName, "KendoGrid")
+		}
+		fmt.Printf("}\n\n\n\n\n")
+	}
+
+	fmt.Println("fim!")
+}
+
+func subProcessData(data interface{}, structName, prefix string) {
+	defaultValue := data.(map[string]interface{})["default"].(string)
+
+	description := data.(map[string]interface{})["description"].(string)
+
+	//<a href="/kendo-ui/api/javascript/kendo/methods/template">template</a>
+	re := regexp.MustCompile(`(<a href="(/kendo-ui/api/javascript/.*?)">(.*?)</a>)`)
+	replaceLink := re.FindAllStringSubmatch(description, -1)
+	for _, replaceList := range replaceLink {
+		description = strings.Replace(description, replaceList[0], fmt.Sprintf("%v [ https://docs.telerik.com%v ]", replaceList[3], replaceList[2]), -1)
+	}
+
+	description = strings.Replace(description, "&lt;", "<", -1)
+	description = strings.Replace(description, "&gt;", ">", -1)
+	description = strings.Replace(description, "<code>", "`", -1)
+	description = strings.Replace(description, "</code>", "´", -1)
+	description = strings.Replace(description, "<blockquote>", "Important:", -1)
+	description = strings.Replace(description, "</blockquote>", "", -1)
+	description = strings.Trim(description, "")
+
+	if defaultValue != "" {
+		description += fmt.Sprintf(" (default: %v)", defaultValue)
+	}
+
+	jsType := ""
+	jsTagType := ""
+	typePrefix := ""
+	//jsType:"*JavaScript,string"
+	jsTypes := data.(map[string]interface{})["types"].([]interface{})
+	if strings.Contains(structName, "Template") || strings.Contains(structName, "template") {
+		jsType = "interface{}"
+		jsTagType = " jsType:\"*JavaScript,string\""
+	} else if hasType(jsTypes, "Function") == true {
+		jsType = "*JavaScript"
+	} else if hasType(jsTypes, "kendo.data.DataSource") == true {
+		jsType = "interface{}"
+		jsTagType = " jsType:\"*KendoDataSource,string,*map[string]interface {},[]string\""
+	} else if hasType(jsTypes, "String") == true && hasType(jsTypes, "Boolean") == true && len(jsTypes) == 2 {
+		jsType = "interface{}"
+		jsTagType = " jsType:\"Boolean,string\""
+	} else if hasType(jsTypes, "String") == true && hasType(jsTypes, "Number") == true && len(jsTypes) == 2 {
+		jsType = "int"
+	} else if hasType(jsTypes, "String") == true && len(jsTypes) == 1 {
+		jsType = "string"
+	} else if hasType(jsTypes, "Date") == true && len(jsTypes) == 1 {
+		jsType = "time.Time"
+	} else if hasType(jsTypes, "Boolean") == true && len(jsTypes) == 1 {
+		jsType = "Boolean"
+	} else if hasType(jsTypes, "Array") == true && len(jsTypes) == 1 {
+		jsType = "[]fixme"
+	} else if hasType(jsTypes, "Object") == true && len(jsTypes) == 1 {
+		//typePrefix = prefix
+		jsType = "*" + prefix + strings.Title(structName)
+	} else if hasType(jsTypes, "Number") == true && len(jsTypes) == 1 {
+		jsType = "int"
+	} else if hasType(jsTypes, "Boolean") == true && hasType(jsTypes, "Object") == true && len(jsTypes) == 2 {
+		//typePrefix = prefix
+		jsTagType = " jsType:\"Boolean,*" + prefix + strings.Title(structName) + "\""
+		jsType = "interface{}"
+	} else {
+		jsType = ""
+	}
+
+	examples := data.(map[string]interface{})["examples"].([]interface{})
+
+	fmt.Printf("/*\n")
+	fmt.Printf("@see %v/configuration/%v\n\n", data.(map[string]interface{})["see"], strings.ToLower(structName))
+	fmt.Printf("%v\n", description)
+	fmt.Printf("*/\n")
+	for _, example := range examples {
+		fmt.Printf("%v\n", example)
+	}
+
+	fmt.Printf("%v %v%v `jsObject:\"%v\"%v`\n\n", strings.Title(structName), typePrefix, jsType, structName, jsTagType)
+}
+
+func hasType(data []interface{}, jsType string) bool {
+	for _, v := range data {
+		if v.(string) == jsType {
+			return true
+		}
+	}
+
+	return false
 }
 
 func download() {
@@ -62,6 +219,7 @@ func download() {
 
 	for _, pageToDownload := range fileToDownload {
 		file := downloadFile(pageToDownload)
+
 		subListToDownload := filterSubFiles(file)
 		for _, newFileToDownload := range subListToDownload {
 			fmt.Println("https://docs.telerik.com/kendo-ui/api/javascript/ui/" + newFileToDownload.Url)
@@ -89,6 +247,7 @@ func download() {
 
 				h3Content := getH3Content(blockH3.All)
 
+				dataToCode[blockH3.Id].(map[string]interface{})["see"] = pageToDownload
 				dataToCode[blockH3.Id].(map[string]interface{})["description"] = getDescription(blockH3.All)
 				dataToCode[blockH3.Id].(map[string]interface{})["default"] = getDefaultValue(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["types"] = getTypes(h3Content)
@@ -105,31 +264,6 @@ func download() {
 	}
 
 	ioutil.WriteFile("./data.json", fileToJSon, 0664)
-	os.Exit(1)
-
-	for _, v := range dataToView {
-		fmt.Println(v + ", ")
-	}
-
-	os.Exit(1)
-
-	for k, v := range dataToCode {
-		fmt.Println(k + ":")
-
-		fmt.Println("description:")
-		fmt.Println(v.(map[string]interface{})["description"])
-
-		fmt.Println("default:")
-		fmt.Println(v.(map[string]interface{})["default"])
-
-		fmt.Println("types:")
-		fmt.Println(v.(map[string]interface{})["types"])
-
-		fmt.Println("examples:")
-		fmt.Println(v.(map[string]interface{})["examples"])
-
-		fmt.Println("\n\n\n\n")
-	}
 }
 
 func getDescription(h3All string) string {
@@ -225,8 +359,12 @@ func getExamples(file string) []string {
 func filterSubFiles(file string) []subFileList {
 	subFiles := make([]subFileList, 0)
 
-	regexpLiMainPage := regexp.MustCompile(`<li>\s*<a href=['"](?P<URL>.*?)['"]\s*>(?P<DATA_NAME>.*?)</a>\s*</li>`)
+	regexpLiMainPage := regexp.MustCompile(`(?ms:<article>(.*?)<h2 id="fields">)`)
 	allElementsLiMainPage := regexpLiMainPage.FindAllStringSubmatch(file, -1)
+	file = allElementsLiMainPage[0][1]
+
+	regexpLiMainPage = regexp.MustCompile(`<li>\s*<a href=['"](?P<URL>.*?)['"]\s*>(?P<DATA_NAME>.*?)</a>\s*</li>`)
+	allElementsLiMainPage = regexpLiMainPage.FindAllStringSubmatch(file, -1)
 	for _, ElementLiMainPage := range allElementsLiMainPage {
 		fileData := subFileList{}
 		fileData.Name = ElementLiMainPage[2]
