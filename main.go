@@ -1,13 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"time"
-
 	"encoding/json"
-	"github.com/helmutkemper/grab"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,6 +21,14 @@ type Block struct {
 	All     string
 	Content string
 }
+
+var fileToDownload = []string{
+	"https://docs.telerik.com/kendo-ui/api/javascript/ui/autocomplete",
+	//"https://docs.telerik.com/kendo-ui/api/javascript/ui/grid",
+	//"https://docs.telerik.com/kendo-ui/api/javascript/ui/listbox",
+}
+
+var fileDownloadStructName = "kendoAutoComplete"
 
 func main() {
 	if _, err := os.Stat("./data.json"); os.IsNotExist(err) {
@@ -79,10 +85,10 @@ func process() {
 	for _, structName := range keys {
 		data := structList[structName]
 
-		subProcessData(data.(map[string]interface{})["main"], structName, "KendoGrid")
+		subProcessData(data.(map[string]interface{})["main"], structName, fileDownloadStructName)
 	}
 
-	fmt.Printf("\n\n\n\n\n")
+	//fmt.Printf("\n\n\n\n\n")
 
 	for _, structName := range keys {
 		data := structList[structName]
@@ -91,15 +97,15 @@ func process() {
 			continue
 		}
 
-		fmt.Printf("type %v struct {\n", strings.Title(structName))
+		//fmt.Printf("type %v struct {\n", strings.Title(structName))
 		for subStructName, subStructData := range data.(map[string]interface{}) {
 			if subStructName == "main" {
 				continue
 			}
 
-			subProcessData(subStructData, subStructName, "KendoGrid")
+			subProcessData(subStructData, subStructName, fileDownloadStructName)
 		}
-		fmt.Printf("}\n\n\n\n\n")
+		//fmt.Printf("}\n\n\n\n\n")
 	}
 
 	keys = []string{}
@@ -113,17 +119,18 @@ func process() {
 	for _, structName := range keys {
 		data := structList[structName]
 
-		fmt.Printf("type %v struct {\n", strings.Title(structName))
+		//fmt.Printf("type %v struct {\n", strings.Title(structName))
 		for subStructName, subStructData := range data.(map[string]interface{}) {
-			subProcessData(subStructData, subStructName, "KendoGrid")
+			subProcessData(subStructData, subStructName, fileDownloadStructName)
 		}
-		fmt.Printf("}\n\n\n\n\n")
+		//fmt.Printf("}\n\n\n\n\n")
 	}
 
-	fmt.Println("fim!")
+	//fmt.Println("fim!")
 }
 
 func subProcessData(data interface{}, structName, prefix string) {
+	return
 	defaultValue := data.(map[string]interface{})["default"].(string)
 
 	description := data.(map[string]interface{})["description"].(string)
@@ -210,20 +217,24 @@ func hasType(data []interface{}, jsType string) bool {
 }
 
 func download() {
-	fileToDownload := []string{
-		"https://docs.telerik.com/kendo-ui/api/javascript/ui/grid",
+
+	f, err := os.OpenFile("./toTag.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		panic(err)
 	}
+
+	defer f.Close()
 
 	var dataToCode = make(map[string]interface{})
 	var dataToView = make([]string, 0)
 
 	for _, pageToDownload := range fileToDownload {
-		file := downloadFile(pageToDownload)
+		file := DownloadFile(pageToDownload)
 
 		subListToDownload := filterSubFiles(file)
 		for _, newFileToDownload := range subListToDownload {
-			fmt.Println("https://docs.telerik.com/kendo-ui/api/javascript/ui/" + newFileToDownload.Url)
-			file := downloadFile("https://docs.telerik.com/kendo-ui/api/javascript/ui/" + newFileToDownload.Url)
+			//fmt.Println("https://docs.telerik.com/kendo-ui/api/javascript/ui/" + newFileToDownload.Url)
+			file := DownloadFile("https://docs.telerik.com/kendo-ui/api/javascript/ui/" + newFileToDownload.Url)
 
 			file = strings.Replace(file, "<h3", "<!-- gambiarra --><h3", -1)
 			file = strings.Replace(file, "</article>", "<!-- gambiarra --></article>", -1)
@@ -252,6 +263,39 @@ func download() {
 				dataToCode[blockH3.Id].(map[string]interface{})["default"] = getDefaultValue(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["types"] = getTypes(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["examples"] = getExamples(blockH3.Content)
+
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n"
+
+				types := getTypes(h3Content)
+				defaultValue := getDefaultValue(h3Content)
+				if len(types) != 0 && defaultValue != "" {
+
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(types, ", ") + " (default: " + defaultValue + ")\n\n"
+
+				} else if len(types) == 0 && defaultValue != "" {
+
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "(default: " + defaultValue + ")\n\n"
+
+				} else if len(types) != 0 && defaultValue == "" {
+
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(types, ", ") + "\n\n"
+
+				}
+
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
+
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n" + "Default: " + getDefaultValue(h3Content) + "\n" + "Type: " + strings.Join(getTypes(h3Content), ", ") + "\n\n" + "Description: " + getDescription(blockH3.All) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\n", "\\n", -1)
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\"", "\\\"", -1)
+				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\""
+
+				// jsonSchema_complex
+				dataToCode[blockH3.Id].(map[string]interface{})["oneOf"] = "[" + strings.Join(getTypes(h3Content), ",") + "]"
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_complex:\"{description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\"," + dataToCode[blockH3.Id].(map[string]interface{})["oneOf"].(string) + "}\""
+
+				if _, err = f.WriteString(fmt.Sprintf("%v %v\n", blockH3.Id, dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string))); err != nil {
+					panic(err)
+				}
 
 			}
 		}
@@ -338,6 +382,7 @@ func getH3Content(file string) string {
 	return ""
 }
 
+/*
 func getExamples(file string) []string {
 	regexpLiMainPage := regexp.MustCompile(`(?smi:(<h4>.*?(?P<DESCRIPTION>Example.*?)</h4>.*?<pre>.*?<code>(?P<CODE>.*?)</code>.*?</pre>))`)
 	allExamples := regexpLiMainPage.FindAllStringSubmatch(file, -1)
@@ -355,11 +400,29 @@ func getExamples(file string) []string {
 
 	return ret
 }
+*/
+
+func getExamples(file string) []string {
+	regexpLiMainPage := regexp.MustCompile(`(?smi:(<h4>.*?(?P<DESCRIPTION>Example.*?)</h4>.*?<pre>.*?<code>(?P<CODE>.*?)</code>.*?</pre>))`)
+	allExamples := regexpLiMainPage.FindAllStringSubmatch(file, -1)
+
+	ret := make([]string, len(allExamples))
+
+	for k, exampleLine := range allExamples {
+		exampleLine[3] = strings.Replace(exampleLine[3], "&lt;", "<", -1)
+		exampleLine[3] = strings.Replace(exampleLine[3], "&gt;", ">", -1)
+
+		ret[k] = exampleLine[2] + "\n\n" + exampleLine[3]
+	}
+
+	return ret
+}
 
 func filterSubFiles(file string) []subFileList {
 	subFiles := make([]subFileList, 0)
 
-	regexpLiMainPage := regexp.MustCompile(`(?ms:<article>(.*?)<h2 id="fields">)`)
+	//regexpLiMainPage := regexp.MustCompile(`(?ms:<article>(.*?)<h2 id="fields">)`)
+	regexpLiMainPage := regexp.MustCompile(`(?ms:<h2 id="configuration">(.*?)</ul>)`)
 	allElementsLiMainPage := regexpLiMainPage.FindAllStringSubmatch(file, -1)
 	file = allElementsLiMainPage[0][1]
 
@@ -376,50 +439,17 @@ func filterSubFiles(file string) []subFileList {
 	return subFiles
 }
 
-func downloadFile(fileToDownload string) string {
-	var err error
+func DownloadFile(url string) string {
 
-	// create client
-	client := grab.NewClient()
-	req, _ := grab.NewRequest(".", fileToDownload)
-
-	// start download
-	fmt.Printf("Downloading %v...\n", req.URL())
-	resp := client.Do(req)
-	fmt.Printf("  %v\n", resp.HTTPResponse.Status)
-
-	// start UI loop
-	t := time.NewTicker(500 * time.Millisecond)
-	defer t.Stop()
-	defer os.Remove(resp.Filename)
-
-Loop:
-	for {
-		select {
-		case <-t.C:
-			fmt.Printf("  transferred %v / %v bytes (%.2f%%)\n",
-				resp.BytesComplete(),
-				resp.Size,
-				100*resp.Progress())
-
-		case <-resp.Done:
-			// download is complete
-			break Loop
-		}
-	}
-
-	// check for errors
-	if err = resp.Err(); err != nil {
-		fmt.Printf("Download failed: %v\n", err.Error())
-		os.Exit(1)
-	}
-
-	fmt.Printf("Download saved to ./%v \n", resp.Filename)
-
-	file, err := ioutil.ReadFile(resp.Filename)
+	// Create the file
+	// Get the data
+	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Printf("ioutil.ReadFile.error: %v", err.Error())
+		return err.Error()
 	}
+	defer resp.Body.Close()
 
-	return string(file)
+	body, err := ioutil.ReadAll(resp.Body)
+
+	return string(body)
 }
