@@ -319,27 +319,31 @@ func download() {
 
 	for k, v := range dataToCode {
 		schema[k] = make(map[string]interface{})
+
+		schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
+		schema[k].(map[string]interface{})["oneOf"] = make([]map[string]interface{}, 0)
+
 		schema[k].(map[string]interface{})["description"] = v.(map[string]interface{})["toTag"]
-		schema[k].(map[string]interface{})["type"] = make(map[string]interface{})
 
-		for _, jsType := range v.(map[string]interface{})["types"].([]string) {
-			jsType = strings.ToLower(jsType)
+		// fixme: apagar - inicio
+		schema[k].(map[string]interface{})["description"] = "olá mundo!"
+		// fixme: apagar - fim
 
-			// fixme: apagar - início
-			//        isto foi colocado para o caso de objetos tipo anime e deve ser removido
-			//        quando o projeto estiver acabado
-
-			//if len(v.(map[string]interface{})["types"].([]string)) > 1 && jsType == "boolean" {
-			//  continue
-			//}
-
-			// fixme: apagar - fim
-
-			schema[k].(map[string]interface{})["types"] = make(map[string]interface{})
-			schema[k].(map[string]interface{})["types"].(map[string]interface{})[jsType] = make(map[string]interface{})
-
-			schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
+		if len(v.(map[string]interface{})["types"].([]string)) != 1 {
+			for typeKey, typeValue := range v.(map[string]interface{})["types"].([]string) {
+				if typeValue == "Boolean" {
+					dataToCode[k].(map[string]interface{})["types"] = append(v.(map[string]interface{})["types"].([]string)[:typeKey], v.(map[string]interface{})["types"].([]string)[:typeKey+1]...)
+					break
+				}
+			}
 		}
+
+		for _, typeValue := range v.(map[string]interface{})["types"].([]string) {
+			typeValue = strings.ToLower(typeValue)
+
+			schema[k].(map[string]interface{})["oneOf"] = append(schema[k].(map[string]interface{})["oneOf"].([]map[string]interface{}), map[string]interface{}{"type": typeValue})
+		}
+
 	}
 
 	dotCount = keyMax + 1
@@ -386,7 +390,7 @@ func download() {
 	if err != nil {
 		log.Panic(err.Error())
 	}
-	fmt.Printf("%s", js)
+	fmt.Printf("%v", strings.Replace(string(js), "\"", "\\\"", -1))
 
 	for {
 		pass := false
