@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dsoprea/go-logging"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -290,14 +291,146 @@ func download() {
 				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\""
 
 				// jsonSchema_complex
-				dataToCode[blockH3.Id].(map[string]interface{})["oneOf"] = "[" + strings.Join(getTypes(h3Content), ",") + "]"
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_complex:\"{description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\"," + dataToCode[blockH3.Id].(map[string]interface{})["oneOf"].(string) + "}\""
 
-				if _, err = f.WriteString(fmt.Sprintf("%v %v\n", blockH3.Id, dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string))); err != nil {
-					panic(err)
+				// fixme: apagar - início
+				// dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "ola mundo"
+				// fixme: apagar - fim
+
+				/*
+					if _, err = f.WriteString(fmt.Sprintf("%v %v\n", blockH3.Id, "")); err != nil {
+						panic(err)
+					}
+				*/
+			}
+		}
+	}
+
+	var keyMax = 0
+	for k := range dataToCode {
+		keyCount := len(strings.Split(k, "."))
+
+		if keyCount > keyMax {
+			keyMax = keyCount
+		}
+	}
+
+	var schema = make(map[string]interface{})
+	dotCount := keyMax
+
+	for k, v := range dataToCode {
+		schema[k] = make(map[string]interface{})
+		schema[k].(map[string]interface{})["description"] = v.(map[string]interface{})["toTag"]
+		schema[k].(map[string]interface{})["type"] = make(map[string]interface{})
+
+		for _, jsType := range v.(map[string]interface{})["types"].([]string) {
+			jsType = strings.ToLower(jsType)
+
+			// fixme: apagar - início
+			//        isto foi colocado para o caso de objetos tipo anime e deve ser removido
+			//        quando o projeto estiver acabado
+
+			//if len(v.(map[string]interface{})["types"].([]string)) > 1 && jsType == "boolean" {
+			//  continue
+			//}
+
+			// fixme: apagar - fim
+
+			schema[k].(map[string]interface{})["types"] = make(map[string]interface{})
+			schema[k].(map[string]interface{})["types"].(map[string]interface{})[jsType] = make(map[string]interface{})
+
+			schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
+		}
+	}
+
+	dotCount = keyMax + 1
+	for {
+		dotCount--
+		if dotCount <= 1 {
+			break
+		}
+
+		var dataToDelete = make([]string, 0)
+
+		for keyInProcess, v := range schema {
+
+			keyCount := len(strings.Split(keyInProcess, "."))
+			if keyCount != dotCount {
+				continue
+			}
+
+			for keyToFind := range schema {
+
+				if strings.LastIndex(keyInProcess+".", keyToFind) == 0 {
+					keyNew := strings.Replace(keyInProcess, keyToFind+".", "", -1)
+					if strings.LastIndex(keyNew, ".") != -1 {
+						continue
+					}
+
+					dataToDelete = append(dataToDelete, keyInProcess)
+
+					schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
+
+					fmt.Printf("entrou: %v\n", keyNew)
 				}
 
 			}
+		}
+
+		for _, v := range dataToDelete {
+			//delete( dataToCode, v )
+			delete(schema, v)
+		}
+	}
+
+	js, err := json.Marshal(schema)
+	if err != nil {
+		log.Panic(err.Error())
+	}
+	fmt.Printf("%s", js)
+
+	for {
+		pass := false
+
+		for k, v := range dataToCode {
+			tagKeysFound := strings.Split(k, ".")
+
+			if len(tagKeysFound) != dotCount {
+				pass = true
+				continue
+			}
+
+			tagKey := tagKeysFound[dotCount-1]
+
+			if dotCount == 1 {
+				schema[tagKey] = make(map[string]interface{})
+				schema[tagKey].(map[string]interface{})["description"] = v.(map[string]interface{})["toTag"]
+				schema[tagKey].(map[string]interface{})["type"] = make(map[string]interface{})
+
+				for _, jsType := range v.(map[string]interface{})["types"].([]string) {
+					jsType = strings.ToLower(jsType)
+
+					// fixme: apagar - início
+					//        isto foi colocado para o caso de objetos tipo anime e deve ser removido
+					//        quando o projeto estiver acabado
+
+					if len(v.(map[string]interface{})["types"].([]string)) > 1 && jsType == "boolean" {
+						continue
+					}
+
+					// fixme: apagar - fim
+
+					schema[tagKey].(map[string]interface{})["properties"] = make(map[string]interface{})
+
+					schema[tagKey].(map[string]interface{})["types"] = make(map[string]interface{})
+					schema[tagKey].(map[string]interface{})["types"].(map[string]interface{})[jsType] = make(map[string]interface{})
+				}
+			}
+		}
+
+		dotCount += 1
+
+		if pass == false {
+			break
 		}
 	}
 
