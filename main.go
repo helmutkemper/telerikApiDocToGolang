@@ -321,12 +321,11 @@ func download() {
 		schema[k] = make(map[string]interface{})
 
 		schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
-		schema[k].(map[string]interface{})["oneOf"] = make([]map[string]interface{}, 0)
 
-		schema[k].(map[string]interface{})["description"] = v.(map[string]interface{})["toTag"]
+		description := v.(map[string]interface{})["toTag"]
 
 		// fixme: apagar - inicio
-		schema[k].(map[string]interface{})["description"] = "olá mundo!"
+		// description = "olá \"mundo!\""
 		// fixme: apagar - fim
 
 		if len(v.(map[string]interface{})["types"].([]string)) != 1 {
@@ -338,11 +337,14 @@ func download() {
 			}
 		}
 
+		oneOf := make([]map[string]interface{}, 0)
 		for _, typeValue := range v.(map[string]interface{})["types"].([]string) {
 			typeValue = strings.ToLower(typeValue)
 
-			schema[k].(map[string]interface{})["oneOf"] = append(schema[k].(map[string]interface{})["oneOf"].([]map[string]interface{}), map[string]interface{}{"type": typeValue})
+			oneOf = append(oneOf, map[string]interface{}{"type": typeValue})
 		}
+
+		schema[k].(map[string]interface{})["properties"] = map[string]interface{}{"description": description, "oneOf": oneOf}
 
 	}
 
@@ -390,8 +392,12 @@ func download() {
 	if err != nil {
 		log.Panic(err.Error())
 	}
-	fmt.Printf("%v", strings.Replace(string(js), "\"", "\\\"", -1))
+	out := strings.Replace(string(js), "\"", "<>a<>s<>p<>a<>s<>", -1)
+	out = strings.Replace(out, "\\", "\\\\", -1)
+	out = strings.Replace(out, "<>a<>s<>p<>a<>s<>", "\\\"", -1)
+	fmt.Printf("%v", out)
 
+	os.Exit(0)
 	for {
 		pass := false
 
