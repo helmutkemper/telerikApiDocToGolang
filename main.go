@@ -259,35 +259,33 @@ func download() {
 
 				h3Content := getH3Content(blockH3.All)
 
-				dataToCode[blockH3.Id].(map[string]interface{})["see"] = pageToDownload
+				dataToCode[blockH3.Id].(map[string]interface{})["see"] = "https://docs.telerik.com/kendo-ui/api/javascript/ui/" + blockH3.Id
 				dataToCode[blockH3.Id].(map[string]interface{})["description"] = getDescription(blockH3.All)
 				dataToCode[blockH3.Id].(map[string]interface{})["default"] = getDefaultValue(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["types"] = getTypes(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["examples"] = getExamples(blockH3.Content)
 
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n"
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "https://docs.telerik.com/kendo-ui/api/javascript/ui/" + blockH3.Id + "\n\n"
 
-				types := getTypes(h3Content)
-				defaultValue := getDefaultValue(h3Content)
-				if len(types) != 0 && defaultValue != "" {
+				if len(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string)) != 0 && dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) != "" {
 
-					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(types, ", ") + " (default: " + defaultValue + ")\n\n"
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string), ", ") + " (default: " + dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) + ")\n\n"
 
-				} else if len(types) == 0 && defaultValue != "" {
+				} else if len(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string)) == 0 && dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) != "" {
 
-					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "(default: " + defaultValue + ")\n\n"
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "(default: " + dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) + ")\n\n"
 
-				} else if len(types) != 0 && defaultValue == "" {
+				} else if len(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string)) != 0 && dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) == "" {
 
-					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(types, ", ") + "\n\n"
+					dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "Type: " + strings.Join(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string), ", ") + "\n\n"
 
 				}
 
 				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
 
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n" + "Default: " + getDefaultValue(h3Content) + "\n" + "Type: " + strings.Join(getTypes(h3Content), ", ") + "\n\n" + "Description: " + getDescription(blockH3.All) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\n", "\\n", -1)
+				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n" + "Default: " + getDefaultValue(h3Content) + "\n" + "Type: " + strings.Join(getTypes(h3Content), ", ") + "\n\n" + "Description: " + getDescription(blockH3.All) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
 				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\"", "\\\"", -1)
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\n", "\\n", -1)
 				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\""
 
 				// jsonSchema_complex
@@ -323,19 +321,6 @@ func download() {
 		schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
 
 		description := v.(map[string]interface{})["toTag"]
-
-		// fixme: apagar - inicio
-		// description = "olá \"mundo!\""
-		// fixme: apagar - fim
-
-		if len(v.(map[string]interface{})["types"].([]string)) != 1 {
-			for typeKey, typeValue := range v.(map[string]interface{})["types"].([]string) {
-				if typeValue == "Boolean" {
-					dataToCode[k].(map[string]interface{})["types"] = append(v.(map[string]interface{})["types"].([]string)[:typeKey], v.(map[string]interface{})["types"].([]string)[:typeKey+1]...)
-					break
-				}
-			}
-		}
 
 		oneOf := make([]map[string]interface{}, 0)
 		for _, typeValue := range v.(map[string]interface{})["types"].([]string) {
@@ -374,7 +359,17 @@ func download() {
 
 					dataToDelete = append(dataToDelete, keyInProcess)
 
-					schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
+					//schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
+					for deepKey, deepValue := range schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{}) {
+						if deepValue["type"] == "object" {
+							if schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] == nil {
+								schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] = make(map[string]interface{})
+							}
+
+							schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] = v
+							fmt.Printf("%v - %v\n", deepKey, deepValue)
+						}
+					}
 
 					fmt.Printf("entrou: %v\n", keyNew)
 				}
