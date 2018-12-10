@@ -322,14 +322,12 @@ func download() {
 
 		description := v.(map[string]interface{})["toTag"]
 
-		oneOf := make([]map[string]interface{}, 0)
-		for _, typeValue := range v.(map[string]interface{})["types"].([]string) {
-			typeValue = strings.ToLower(typeValue)
-
-			oneOf = append(oneOf, map[string]interface{}{"type": typeValue})
+		if len(v.(map[string]interface{})["types"].([]string)) == 1 {
+			schema[k].(map[string]interface{})["type"] = strings.ToLower(v.(map[string]interface{})["types"].([]string)[0])
 		}
 
-		schema[k].(map[string]interface{})["properties"] = map[string]interface{}{"description": description, "oneOf": oneOf}
+		schema[k].(map[string]interface{})["description"] = description
+		schema[k].(map[string]interface{})["properties"] = map[string]interface{}{} //{"oneOf": oneOf}
 
 	}
 
@@ -359,26 +357,16 @@ func download() {
 
 					dataToDelete = append(dataToDelete, keyInProcess)
 
-					//schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
-					for deepKey, deepValue := range schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{}) {
-						if deepValue["type"] == "object" {
-							if schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] == nil {
-								schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] = make(map[string]interface{})
-							}
-
-							schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})["oneOf"].([]map[string]interface{})[deepKey]["properties"] = v
-							fmt.Printf("%v - %v\n", deepKey, deepValue)
-						}
+					if len(v.(map[string]interface{})["properties"].(map[string]interface{})) == 0 {
+						delete(v.(map[string]interface{}), "properties")
 					}
 
-					fmt.Printf("entrou: %v\n", keyNew)
+					schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
 				}
-
 			}
 		}
 
 		for _, v := range dataToDelete {
-			//delete( dataToCode, v )
 			delete(schema, v)
 		}
 	}
