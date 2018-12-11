@@ -362,6 +362,10 @@ func download() {
 					}
 
 					schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})[keyNew] = v
+
+					if len(schema[keyToFind].(map[string]interface{})["properties"].(map[string]interface{})) > 1 {
+						schema[keyToFind].(map[string]interface{})["type"] = "object"
+					}
 				}
 			}
 		}
