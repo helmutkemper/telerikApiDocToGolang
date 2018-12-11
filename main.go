@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dsoprea/go-logging"
+	"github.com/helmutkemper/telerik"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -259,13 +261,20 @@ func download() {
 
 				h3Content := getH3Content(blockH3.All)
 
+				description := strings.Replace(getDescription(blockH3.All), "<code>", "**", -1)
+				description = strings.Replace(description, "</code>", "**", -1)
+
+				examples := strings.Replace(strings.Join(getExamples(blockH3.Content), "\n\n"), "\"", "'", -1)
+
 				dataToCode[blockH3.Id].(map[string]interface{})["see"] = "https://docs.telerik.com/kendo-ui/api/javascript/ui/" + blockH3.Id
-				dataToCode[blockH3.Id].(map[string]interface{})["description"] = getDescription(blockH3.All)
+				dataToCode[blockH3.Id].(map[string]interface{})["description"] = description
 				dataToCode[blockH3.Id].(map[string]interface{})["default"] = getDefaultValue(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["types"] = getTypes(h3Content)
 				dataToCode[blockH3.Id].(map[string]interface{})["examples"] = getExamples(blockH3.Content)
 
 				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "https://docs.telerik.com/kendo-ui/api/javascript/ui/" + blockH3.Id + "\n\n"
+
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + dataToCode[blockH3.Id].(map[string]interface{})["description"].(string) + "\n\n"
 
 				if len(dataToCode[blockH3.Id].(map[string]interface{})["types"].([]string)) != 0 && dataToCode[blockH3.Id].(map[string]interface{})["default"].(string) != "" {
 
@@ -281,11 +290,11 @@ func download() {
 
 				}
 
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
+				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\n\n" + examples
 
 				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = pageToDownload + "\n\n" + "Default: " + getDefaultValue(h3Content) + "\n" + "Type: " + strings.Join(getTypes(h3Content), ", ") + "\n\n" + "Description: " + getDescription(blockH3.All) + "\n\n" + strings.Join(getExamples(blockH3.Content), "\n")
 				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\"", "\\\"", -1)
-				dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\n", "\\n", -1)
+				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = strings.Replace(dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string), "\n", "\\n", -1)
 				//dataToCode[blockH3.Id].(map[string]interface{})["toTag"] = "jsonSchema_description:\"" + dataToCode[blockH3.Id].(map[string]interface{})["toTag"].(string) + "\""
 
 				// jsonSchema_complex
@@ -318,7 +327,7 @@ func download() {
 	for k, v := range dataToCode {
 		schema[k] = make(map[string]interface{})
 
-		schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
+		//schema[k].(map[string]interface{})["properties"] = make(map[string]interface{})
 
 		description := v.(map[string]interface{})["toTag"]
 
@@ -329,6 +338,27 @@ func download() {
 		schema[k].(map[string]interface{})["description"] = description
 		schema[k].(map[string]interface{})["properties"] = map[string]interface{}{} //{"oneOf": oneOf}
 
+		if v.(map[string]interface{})["default"].(string) != "" {
+
+			if intDefault, err := strconv.ParseInt(v.(map[string]interface{})["default"].(string), 10, 64); err == nil {
+
+				schema[k].(map[string]interface{})["default"] = intDefault
+
+			} else if boolDefault, err := strconv.ParseBool(v.(map[string]interface{})["default"].(string)); err == nil {
+
+				schema[k].(map[string]interface{})["default"] = boolDefault
+
+			} else if floatDefault, err := strconv.ParseFloat(v.(map[string]interface{})["default"].(string), 64); err == nil {
+
+				schema[k].(map[string]interface{})["default"] = floatDefault
+
+			} else {
+
+				schema[k].(map[string]interface{})["default"] = v.(map[string]interface{})["default"]
+
+			}
+
+		}
 	}
 
 	dotCount = keyMax + 1
@@ -373,6 +403,14 @@ func download() {
 		for _, v := range dataToDelete {
 			delete(schema, v)
 		}
+	}
+
+	for k, v := range schema {
+
+		if v.(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(string) == "" {
+			schema[k].(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"] = strings.Join(telerik.KendoEffects[1:], ", ")
+		}
+
 	}
 
 	js, err := json.Marshal(schema)
