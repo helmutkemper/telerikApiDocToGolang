@@ -407,8 +407,19 @@ func download() {
 
 	for k, v := range schema {
 
-		if v.(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(string) == "" {
-			schema[k].(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"] = strings.Join(telerik.KendoEffects[1:], ", ")
+		//if v.(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(string) == "" {
+		if v.(map[string]interface{})["properties"] != nil {
+
+			if v.(map[string]interface{})["properties"].(map[string]interface{})["close"] != nil {
+
+				if v.(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"] != nil {
+
+					schema[k].(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(map[string]interface{})["enum"] = telerik.KendoEffects[1:]
+
+				}
+
+			}
+
 		}
 
 	}
