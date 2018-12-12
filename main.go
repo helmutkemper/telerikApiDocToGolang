@@ -405,6 +405,7 @@ func download() {
 		}
 	}
 
+	// Monta as constantes na forma de array
 	for k, v := range schema {
 
 		//if v.(map[string]interface{})["properties"].(map[string]interface{})["close"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(string) == "" {
