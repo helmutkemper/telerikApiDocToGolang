@@ -420,6 +420,16 @@ func download() {
 
 			}
 
+			if v.(map[string]interface{})["properties"].(map[string]interface{})["open"] != nil {
+
+				if v.(map[string]interface{})["properties"].(map[string]interface{})["open"].(map[string]interface{})["properties"].(map[string]interface{})["effects"] != nil {
+
+					schema[k].(map[string]interface{})["properties"].(map[string]interface{})["open"].(map[string]interface{})["properties"].(map[string]interface{})["effects"].(map[string]interface{})["enum"] = telerik.KendoEffects[1:]
+
+				}
+
+			}
+
 		}
 
 	}
